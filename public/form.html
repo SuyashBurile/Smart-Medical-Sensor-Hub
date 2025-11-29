@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Patient Form</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>Enter Patient Info</h1>
+  <div class="container">
+    <form id="patientForm">
+      <input type="text" id="name" placeholder="Patient Name" required>
+      <input type="number" id="age" placeholder="Age" required>
+      <select id="gender">
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+      </select>
+
+      <input type="text" id="heartRate" placeholder="Heart Rate" disabled>
+      <input type="text" id="temperature" placeholder="Temperature" disabled>
+      <input type="text" id="ecg" placeholder="ECG" disabled>
+      <input type="text" id="sugar" placeholder="Sugar" disabled>
+      <input type="text" id="bp" placeholder="BP" disabled>
+
+      <button type="submit">Save Patient</button>
+      <button type="button" onclick="nextPatient()">Next Patient</button>
+
+    </form>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
