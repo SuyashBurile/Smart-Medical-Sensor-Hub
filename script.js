@@ -1,228 +1,213 @@
-// script.js — live metrics, ECG plotting, patient save logic
+// script.js — front-end logic for Smart Medical Sensor Hub
 
-const DEFAULT_DEVICE = 'esp32-001';
-
-let lastSavedPatientNumber = null;
-let ecgBufferSize = 600;
-let ecgBuffer = new Array(ecgBufferSize).fill(null);
-let ecgHead = 0;
-let ecgZoom = 1.0;
-
-const METRIC_INTERVAL = 2000;  // 2s for vitals
-const ECG_INTERVAL = 300;      // extra sampling for ECG
-
-// canvas init
-const canvas = document.getElementById('ecgCanvas');
-let ctx = null;
-if (canvas) {
-  const DPR = window.devicePixelRatio || 1;
-  canvas.width = canvas.clientWidth * DPR;
-  canvas.height = canvas.clientHeight * DPR;
-  ctx = canvas.getContext('2d');
-  ctx.scale(DPR, DPR);
+// Helper to set value or default
+function setText(id, value, fallback = "--") {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (value === undefined || value === null || value === "") {
+    el.textContent = fallback;
+  } else {
+    el.textContent = value;
+  }
 }
 
-// helpers
-function getDeviceId() {
-  const el = document.getElementById('deviceId');
-  return (el && el.value.trim()) || DEFAULT_DEVICE;
+// Simple ECG drawing buffer
+const ecgBuffer = [];
+let ecgZoom = 1;
+
+function pushEcgSample(val) {
+  if (typeof val !== "number") return;
+  ecgBuffer.push(val);
+  if (ecgBuffer.length > 500) ecgBuffer.shift();
+  drawEcg();
 }
 
-function pushECGSample(value) {
-  const v = Number(value);
-  if (Number.isNaN(v)) return;
-  ecgBuffer[ecgHead] = v;
-  ecgHead = (ecgHead + 1) % ecgBufferSize;
-}
+function drawEcg() {
+  const canvas = document.getElementById("ecgCanvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
 
-function drawECG() {
-  if (!ctx || !canvas) return;
-
-  const w = canvas.clientWidth;
-  const h = canvas.clientHeight;
-
+  const w = canvas.width;
+  const h = canvas.height;
   ctx.clearRect(0, 0, w, h);
 
-  // background
-  ctx.fillStyle = '#010814';
-  ctx.fillRect(0, 0, w, h);
-
-  // midline
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  // baseline
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, h / 2);
   ctx.lineTo(w, h / 2);
   ctx.stroke();
 
-  // ECG line
-  const data = ecgBuffer.filter(v => v !== null);
-  if (!data.length) return;
+  if (ecgBuffer.length < 2) return;
 
-  const visibleCount = Math.floor(data.length / ecgZoom);
-  const slice = data.slice(-visibleCount);
-  const step = Math.max(1, Math.floor(slice.length / w));
+  const maxVal = 4095;
+  const scale = (h * 0.4) * ecgZoom;
 
-  ctx.strokeStyle = '#22c55e';
-  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = "#40E0D0";
+  ctx.lineWidth = 2;
   ctx.beginPath();
 
-  let x = 0;
-  for (let i = 0; i < slice.length; i += step) {
-    const v = slice[i];
-    const norm = Math.max(0, Math.min(1, v / 4095)); // 0..1
-    const y = h - norm * h;
-    if (x === 0) ctx.moveTo(x, y);
+  for (let i = 0; i < ecgBuffer.length; i++) {
+    const x = (i / (ecgBuffer.length - 1)) * w;
+    const centered = (ecgBuffer[i] / maxVal - 0.5) * 2;
+    const y = h / 2 - centered * scale;
+
+    if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
-    x += 1;
   }
   ctx.stroke();
 }
 
-// update connection status
-function setConnectionStatus(online) {
-  const dot = document.getElementById('connDot');
-  const text = document.getElementById('connectedText');
-  if (!dot || !text) return;
+document.addEventListener("DOMContentLoaded", () => {
+  const fullName   = document.getElementById("fullName");
+  const age        = document.getElementById("age");
+  const gender     = document.getElementById("gender");
+  const deviceId   = document.getElementById("deviceId");
 
-  if (online) {
-    dot.style.color = '#22c55e';
-    text.textContent = 'Online';
-  } else {
-    dot.style.color = '#f97373';
-    text.textContent = 'Offline';
-  }
-}
+  const saveBtn        = document.getElementById("saveBtn");
+  const clearBtn       = document.getElementById("clearBtn");
+  const fetchBtn       = document.getElementById("fetchLatestBtn");
+  const fetchStatus    = document.getElementById("fetchStatus");
+  const patientNumber  = document.getElementById("patientNumber");
+  const lastSaved      = document.getElementById("lastSaved");
+  const deviceStatus   = document.getElementById("deviceStatus");
+  const nextPatientBtn = document.getElementById("nextPatientBtn");
 
-// fetch metrics (HR, SpO2, temp, BP, sugar, GSR, lung, ECG)
-async function fetchMetrics() {
-  const device = getDeviceId();
-  try {
-    const res = await fetch(`/latest/${device}`);
-    if (!res.ok) {
-      setConnectionStatus(false);
+  const zoomInBtn  = document.getElementById("zoomInBtn");
+  const zoomOutBtn = document.getElementById("zoomOutBtn");
+
+  // default device id (MUST match device_id in ESP32 code)
+  if (!deviceId.value) deviceId.value = "esp32-sensor-1";
+
+
+  // ---- Fetch latest sensor snapshot from backend (which ESP32 posted) ----
+  async function loadFromEsp32() {
+    const id = deviceId.value.trim();
+    if (!id) {
+      fetchStatus.textContent = "Enter Device ID first.";
       return;
     }
-    const data = await res.json();
-    const hasData = Object.keys(data).length > 0;
-    setConnectionStatus(hasData);
+    fetchStatus.textContent = "Contacting server…";
 
-    // map to UI
-    const hrEl = document.getElementById('hr');
-    const spo2El = document.getElementById('spo2');
-    const tempEl = document.getElementById('temp');
-    const bpEl = document.getElementById('bp');
-    const sugarEl = document.getElementById('sugar');
-    const gsrEl = document.getElementById('gsr');
-    const lungEl = document.getElementById('lung');
-
-    const hr = data.heartRate || data.hr;
-    if (hrEl) hrEl.innerHTML = (hr ? hr : '--') + ' <span class="muted">bpm</span>';
-
-    const spo2 = data.spo2;
-    if (spo2El) spo2El.innerHTML = (spo2 ? spo2 : '--') + ' <span class="muted">%</span>';
-
-    const temp = data.temperature;
-    if (tempEl) tempEl.innerHTML = (temp ? temp : '--') + ' <span class="muted">°C</span>';
-
-    if (bpEl) {
-      if (data.bp) bpEl.textContent = data.bp;
-      else if (data.bp_sys && data.bp_dia) bpEl.textContent = `${data.bp_sys}/${data.bp_dia}`;
-      else bpEl.textContent = '-- / --';
-    }
-
-    const sugar = data.glucose || data.sugar;
-    if (sugarEl) sugarEl.innerHTML = (sugar ? sugar : '--') + ' <span class="muted">mg/dL</span>';
-
-    const gsr = data.gsr;
-    if (gsrEl) gsrEl.textContent = gsr ? `${gsr}` : '--';
-
-    const spiro = data.spiro;
-    if (lungEl) lungEl.innerHTML = (spiro ? spiro : '--') + ' <span class="muted">units</span>';
-
-    if (data.ecg !== undefined) {
-      pushECGSample(data.ecg);
-    }
-  } catch {
-    setConnectionStatus(false);
-  }
-}
-
-// extra ECG-specific polling (more frequent)
-async function fetchECGOnly() {
-  const device = getDeviceId();
-  try {
-    const res = await fetch(`/latest/${device}`);
-    if (!res.ok) return;
-    const data = await res.json();
-    if (data.ecg !== undefined) {
-      pushECGSample(data.ecg);
-    }
-  } catch {
-    // ignore
-  }
-}
-
-// patient save + UI hooks
-document.addEventListener('DOMContentLoaded', () => {
-  const form = document.getElementById('patientForm');
-  const patientIdEl = document.getElementById('patientId');
-  const recentSavedEl = document.getElementById('recentSaved');
-
-  if (form) {
-    form.addEventListener('submit', async (ev) => {
-      ev.preventDefault();
-      const payload = {
-        name: document.getElementById('name').value,
-        age: document.getElementById('age').value,
-        gender: document.getElementById('gender').value,
-        device_id: getDeviceId()
-      };
-
-      try {
-        const res = await fetch('/submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        if (res.ok) {
-          const json = await res.json();
-          lastSavedPatientNumber = json.patientNumber;
-          if (patientIdEl) patientIdEl.textContent = lastSavedPatientNumber;
-          if (recentSavedEl) recentSavedEl.textContent = lastSavedPatientNumber;
-          alert('Saved — Patient #' + lastSavedPatientNumber);
-          form.reset();
-        } else {
-          const txt = await res.text();
-          alert('Save failed: ' + txt);
-        }
-      } catch {
-        alert('Network error while saving');
+    try {
+      const res = await fetch(`/latest/${encodeURIComponent(id)}`);
+      if (!res.ok) {
+        fetchStatus.textContent = "No data (server error).";
+        deviceStatus.textContent = "Offline";
+        deviceStatus.classList.add("off");
+        return;
       }
+      const data = await res.json();
+      if (!data || Object.keys(data).length === 0) {
+        fetchStatus.textContent = "No recent data from this device.";
+        deviceStatus.textContent = "Offline";
+        deviceStatus.classList.add("off");
+        return;
+      }
+
+      // Update vitals
+      setText("hrValue", data.heartRate);
+      setText("spo2Value", data.spo2);
+      setText("tempValue", data.temperature);
+      const bpText =
+        data.bp_sys && data.bp_dia
+          ? `${data.bp_sys} / ${data.bp_dia}`
+          : data.bp || "-- / --";
+      setText("bpValue", bpText, "-- / --");
+      setText("glucoseValue", data.glucose);
+      setText("gsrValue", data.gsr);
+      setText("spiroValue", data.spiro);
+
+      // ECG single sample (for now just one)
+      if (data.ecg !== undefined && data.ecg !== null && data.ecg !== "") {
+        const v = Number(data.ecg);
+        if (!Number.isNaN(v)) pushEcgSample(v);
+      }
+
+      deviceStatus.textContent = "Online";
+      deviceStatus.classList.remove("off");
+      fetchStatus.textContent = "Live data loaded.";
+    } catch (err) {
+      console.error(err);
+      fetchStatus.textContent = "Network error while fetching.";
+      deviceStatus.textContent = "Offline";
+      deviceStatus.classList.add("off");
+    }
+  }
+
+  // ---- Save patient + current readings ----
+  async function savePatient() {
+    const nameVal = fullName.value.trim();
+    const ageVal  = age.value.trim();
+    const genderVal = gender.value;
+    const devVal  = deviceId.value.trim();
+
+    if (!nameVal || !ageVal || !devVal) {
+      alert("Please fill Name, Age and Device ID.");
+      return;
+    }
+
+    try {
+      const res = await fetch("/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: nameVal,
+          age: ageVal,
+          gender: genderVal,
+          device_id: devVal
+        })
+      });
+
+      if (!res.ok) {
+        alert("Server error while saving.");
+        return;
+      }
+
+      const data = await res.json();
+      patientNumber.textContent = data.patientNumber ?? "—";
+      const ts = new Date().toLocaleString();
+      lastSaved.textContent = ts;
+
+      alert("Patient saved successfully.");
+    } catch (err) {
+      console.error(err);
+      alert("Network error while saving.");
+    }
+  }
+
+  function clearForm() {
+    fullName.value = "";
+    age.value = "";
+    gender.value = "Male";
+    // keep device ID same
+  }
+
+  // ---- Event listeners ----
+  if (fetchBtn) fetchBtn.addEventListener("click", loadFromEsp32);
+  if (saveBtn) saveBtn.addEventListener("click", savePatient);
+  if (clearBtn) clearBtn.addEventListener("click", clearForm);
+  if (nextPatientBtn) nextPatientBtn.addEventListener("click", () => {
+    clearForm();
+    patientNumber.textContent = "—";
+    lastSaved.textContent = "—";
+  });
+
+  if (zoomInBtn) {
+    zoomInBtn.addEventListener("click", () => {
+      ecgZoom = Math.min(ecgZoom + 0.2, 3);
+      drawEcg();
     });
   }
 
-  const zoomIn = document.getElementById('zoomIn');
-  const zoomOut = document.getElementById('zoomOut');
-  if (zoomIn) zoomIn.onclick = () => { ecgZoom = Math.min(3, ecgZoom + 0.2); };
-  if (zoomOut) zoomOut.onclick = () => { ecgZoom = Math.max(0.5, ecgZoom - 0.2); };
-
-  fetchMetrics();
-});
-
-// global for inline onclick
-function nextPatient() {
-  const form = document.getElementById('patientForm');
-  if (form) form.reset();
-  const patientIdEl = document.getElementById('patientId');
-  if (patientIdEl) {
-    if (lastSavedPatientNumber) patientIdEl.textContent = Number(lastSavedPatientNumber) + 1;
-    else patientIdEl.textContent = '—';
+  if (zoomOutBtn) {
+    zoomOutBtn.addEventListener("click", () => {
+      ecgZoom = Math.max(ecgZoom - 0.2, 0.4);
+      drawEcg();
+    });
   }
-}
-window.nextPatient = nextPatient;
 
-// periodic tasks
-setInterval(fetchMetrics, METRIC_INTERVAL);
-setInterval(fetchECGOnly, ECG_INTERVAL);
-setInterval(() => { if (canvas) drawECG(); }, 200);
+  // Optional: auto-load once when page opens
+  loadFromEsp32();
+});

@@ -2,195 +2,195 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Smart Medical — Dashboard</title>
+  <title>Smart Medical Sensor Hub — Dashboard</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
-<body>
-  <div class="app-shell">
-    <header class="topbar">
-      <div class="brand">
-        <svg class="logo" width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="1.8" y="1.8" width="20.4" height="20.4" rx="5" fill="url(#g)"></rect>
-          <path d="M8 12h8M12 8v8" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-          <defs>
-            <linearGradient id="g" x1="0" x2="1">
-              <stop offset="0" stop-color="#06b6d4"/>
-              <stop offset="1" stop-color="#0ea5e9"/>
-            </linearGradient>
-          </defs>
-        </svg>
-        <div class="brand-text">
-          <div class="title">Smart Medical</div>
-          <div class="subtitle">Live Patient Monitoring</div>
+<body class="app-body">
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-dot">+</span>
+      <div>
+        <div class="brand-title">Smart Medical</div>
+        <div class="brand-subtitle">Live Patient Monitoring</div>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="patient-counter">
+        <span class="label">Patient #</span>
+        <span id="patientNumber">—</span>
+      </div>
+      <button id="nextPatientBtn" class="btn secondary ghost">Next Patient</button>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <!-- Left column: Patient info -->
+    <section class="panel card glass patient-panel">
+      <div class="panel-header">
+        <h2>Patient Info</h2>
+        <span class="dot"></span>
+      </div>
+
+      <p class="muted tiny">Fill before saving</p>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="fullName">Full name</label>
+          <input id="fullName" placeholder="John Doe" />
+        </div>
+
+        <div class="form-group">
+          <label for="age">Age</label>
+          <input id="age" placeholder="32" inputmode="numeric" />
+        </div>
+
+        <div class="form-group">
+          <label for="gender">Gender</label>
+          <select id="gender">
+            <option value="Male" selected>Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group full">
+          <label for="deviceId">Device ID</label>
+          <input id="deviceId" placeholder="esp32-001" />
         </div>
       </div>
 
-      <div class="top-actions">
-        <div class="patient-badge">
-          <div class="badge-label">Patient #</div>
-          <div id="patientId" class="badge-value">—</div>
-        </div>
+      <!-- NEW: Load from ESP32 -->
+      <div class="form-row-inline">
+        <button id="fetchLatestBtn" class="btn ghost small">Load from ESP32</button>
+        <span id="fetchStatus" class="muted tiny">Waiting for device…</span>
+      </div>
 
-        <div class="action-buttons">
-          <button class="btn ghost" onclick="nextPatient()">Next Patient</button>
+      <div class="actions mt">
+        <button id="saveBtn" class="btn primary">Save Patient</button>
+        <button id="clearBtn" class="btn danger ghost">Clear</button>
+      </div>
+
+      <div class="foot-row">
+        <div>
+          <div class="muted tiny">Saved records are exported to</div>
+          <div class="muted tiny"><b>Excel</b> and <b>CSV</b> on the server.</div>
+        </div>
+        <div class="status-block">
+          <div class="muted tiny">Recent Saved</div>
+          <div id="lastSaved" class="status-value">—</div>
+        </div>
+        <div class="status-block">
+          <div class="muted tiny">Device</div>
+          <div id="deviceStatus" class="status-value off">Offline</div>
         </div>
       </div>
-    </header>
+    </section>
 
-    <main class="main">
-      <aside class="left-col">
-        <div class="card glass patient-card">
-          <div class="pc-head">
-            <div>
-              <h3 class="pc-title">Patient Info</h3>
-              <p class="pc-sub">Fill before saving</p>
-            </div>
-            <div class="status-dot" id="connDot" title="Device status">●</div>
+    <!-- Right column: vitals + ECG -->
+    <section class="right-column">
+      <div class="cards-grid">
+        <article class="vital-card hr">
+          <div class="label-row">
+            <span>Heart Rate</span>
+            <span class="icon">❤</span>
           </div>
-
-          <form id="patientForm" class="pc-form">
-            <label class="lbl">Full name</label>
-            <input id="name" placeholder="John Doe" required>
-
-            <div class="row">
-              <div class="col">
-                <label class="lbl">Age</label>
-                <input id="age" type="number" min="0" placeholder="32" required>
-              </div>
-              <div class="col">
-                <label class="lbl">Gender</label>
-                <select id="gender">
-                  <option>Male</option>
-                  <option>Female</option>
-                  <option>Other</option>
-                </select>
-              </div>
-            </div>
-
-            <label class="lbl">Device ID</label>
-            <input id="deviceId" value="esp32-001" placeholder="esp32-001">
-
-            <div class="pc-actions">
-              <button class="btn primary" type="submit">Save Patient</button>
-              <button class="btn" type="button" onclick="nextPatient()">Clear</button>
-            </div>
-
-            <div class="small-note">
-              Saved records are exported to <strong>Excel</strong> and <strong>CSV</strong> on the server.
-            </div>
-          </form>
-        </div>
-
-        <div class="card quick-stats">
-          <div class="qs-row">
-            <div>
-              <div class="qs-title">Recent Saved</div>
-              <div id="recentSaved" class="qs-num">—</div>
-            </div>
-            <div>
-              <div class="qs-title">Device</div>
-              <div id="connectedText" class="qs-num">Offline</div>
-            </div>
+          <div class="value-row">
+            <span id="hrValue">--</span>
+            <span class="unit">bpm</span>
           </div>
-        </div>
+        </article>
 
-        <div class="card help-card">
-          <h4>Tips</h4>
-          <ul>
-            <li>Ensure ESP32 is sending live data to <code>/sensor-data</code>.</li>
-            <li>Device ID should match the one programmed on ESP32.</li>
-            <li>After saving, click <strong>Next Patient</strong> for a new record.</li>
-          </ul>
-        </div>
-      </aside>
-
-      <section class="right-col">
-        <div class="metrics-grid">
-          <div class="metric card grad hr">
-            <div class="m-left">
-              <div class="m-title">Heart Rate</div>
-              <div id="hr" class="m-value">-- <span class="muted">bpm</span></div>
-            </div>
-            <div class="m-icon">♥</div>
+        <article class="vital-card spo2">
+          <div class="label-row">
+            <span>SpO₂</span>
+            <span class="icon">O₂</span>
           </div>
-
-          <div class="metric card grad spo2">
-            <div class="m-left">
-              <div class="m-title">SpO₂</div>
-              <div id="spo2" class="m-value">-- <span class="muted">%</span></div>
-            </div>
-            <div class="m-icon">O₂</div>
+          <div class="value-row">
+            <span id="spo2Value">--</span>
+            <span class="unit">%</span>
           </div>
+        </article>
 
-          <div class="metric card grad temp">
-            <div class="m-left">
-              <div class="m-title">Temperature</div>
-              <div id="temp" class="m-value">-- <span class="muted">°C</span></div>
-            </div>
-            <div class="m-icon">🌡</div>
+        <article class="vital-card temp">
+          <div class="label-row">
+            <span>Temperature</span>
+            <span class="icon">🌡</span>
           </div>
-
-          <div class="metric card grad bp">
-            <div class="m-left">
-              <div class="m-title">Blood Pressure</div>
-              <div id="bp" class="m-value">-- / --</div>
-            </div>
-            <div class="m-icon">🩺</div>
+          <div class="value-row">
+            <span id="tempValue">--</span>
+            <span class="unit">°C</span>
           </div>
+        </article>
 
-          <div class="metric card grad sugar">
-            <div class="m-left">
-              <div class="m-title">Glucose</div>
-              <div id="sugar" class="m-value">-- <span class="muted">mg/dL</span></div>
-            </div>
-            <div class="m-icon">🍬</div>
+        <article class="vital-card bp">
+          <div class="label-row">
+            <span>Blood Pressure</span>
+            <span class="icon">🩸</span>
           </div>
-
-          <div class="metric card grad gsr">
-            <div class="m-left">
-              <div class="m-title">Stress (GSR)</div>
-              <div id="gsr" class="m-value">--</div>
-            </div>
-            <div class="m-icon">⚡</div>
+          <div class="value-row stacked">
+            <span id="bpValue">-- / --</span>
+            <span class="unit">mmHg</span>
           </div>
+        </article>
 
-          <div class="metric card grad lung">
-            <div class="m-left">
-              <div class="m-title">Lung Capacity</div>
-              <div id="lung" class="m-value">-- <span class="muted">units</span></div>
-            </div>
-            <div class="m-icon">💨</div>
+        <article class="vital-card glucose">
+          <div class="label-row">
+            <span>Glucose</span>
+            <span class="icon">🧪</span>
           </div>
-        </div>
+          <div class="value-row">
+            <span id="glucoseValue">--</span>
+            <span class="unit">mg/dL</span>
+          </div>
+        </article>
 
-        <div class="ecg-card card">
-          <div class="ecg-head">
+        <article class="vital-card gsr">
+          <div class="label-row">
+            <span>Stress (GSR)</span>
+            <span class="icon">⚡</span>
+          </div>
+          <div class="value-row">
+            <span id="gsrValue">--</span>
+            <span class="unit">units</span>
+          </div>
+        </article>
+
+        <article class="vital-card spiro">
+          <div class="label-row">
+            <span>Lung Capacity</span>
+            <span class="icon">🫁</span>
+          </div>
+          <div class="value-row">
+            <span id="spiroValue">--</span>
+            <span class="unit">units</span>
+          </div>
+        </article>
+      </div>
+
+      <section class="ecg-panel card glass">
+        <div class="ecg-header">
+          <div>
             <h3>ECG Live Waveform</h3>
-            <div class="ecg-toolbar">
-              <button class="btn small" id="zoomIn">Zoom +</button>
-              <button class="btn small" id="zoomOut">Zoom −</button>
-            </div>
+            <p class="muted tiny">Realtime ECG — plotted as values arrive from the device.</p>
           </div>
-
-          <div class="ecg-canvas-wrap">
-            <canvas id="ecgCanvas"></canvas>
-          </div>
-
-          <div class="ecg-footer muted">
-            Realtime ECG — plotted as values arrive from the device.
+          <div class="zoom-buttons">
+            <button class="btn tiny ghost" id="zoomOutBtn">Zoom −</button>
+            <button class="btn tiny ghost" id="zoomInBtn">Zoom +</button>
           </div>
         </div>
+        <canvas id="ecgCanvas" width="900" height="260"></canvas>
       </section>
-    </main>
 
-    <footer class="footer">
-      <div>© Smart Medical • Live Monitoring</div>
-      <div class="footer-right">Export: <a href="/patient_data.csv" download>CSV</a></div>
-    </footer>
-  </div>
+      <footer class="page-footer">
+        <span class="muted tiny">© Smart Medical • Live Monitoring</span>
+        <a href="patient_data.csv" class="muted tiny link">Export: CSV</a>
+      </footer>
+    </section>
+  </main>
 
   <script src="script.js"></script>
 </body>

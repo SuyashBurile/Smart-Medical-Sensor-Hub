@@ -5,6 +5,7 @@ const bodyParser = require('body-parser');
 const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
+const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,6 +14,7 @@ const excelFile = 'patient_data.xlsx';
 const csvFile = 'patient_data.csv';
 const counterFile = 'patient_counter.json';
 
+app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(__dirname));
 
@@ -23,9 +25,7 @@ let latestSensorData = {};
 let patientCounter = 0;
 if (fs.existsSync(counterFile)) {
   try {
-    patientCounter = JSON.parse(
-      fs.readFileSync(counterFile, 'utf8')
-    ).counter || 0;
+    patientCounter = JSON.parse(fs.readFileSync(counterFile, 'utf8')).counter || 0;
   } catch {
     patientCounter = 0;
   }
@@ -55,25 +55,32 @@ app.post('/sensor-data', (req, res) => {
     device_id: data.device_id,
     timestamp: data.timestamp || new Date().toISOString(),
     seq: data.seq || '',
-    heartRate: data.heartRate || data.hr || '',
-    spo2: data.spo2 || '',
-    temperature: data.temperature || '',
-    ecg: data.ecg || '',
-    glucose: data.glucose || data.sugar || '',
-    bp_sys: data.bp_sys || '',
-    bp_dia: data.bp_dia || '',
-    bp: data.bp || '',
-    gsr: data.gsr || '',
-    spiro: data.spiro || ''
+    heartRate: data.heartRate ?? data.hr ?? '',
+    spo2: data.spo2 ?? '',
+    temperature: data.temperature ?? '',
+    ecg: data.ecg ?? '',
+    glucose: data.glucose ?? data.sugar ?? '',
+    bp_sys: data.bp_sys ?? '',
+    bp_dia: data.bp_dia ?? '',
+    bp: data.bp ?? '',
+    gsr: data.gsr ?? '',
+    spiro: data.spiro ?? ''
   };
 
   console.log('Sensor Data:', latestSensorData[data.device_id]);
   res.json({ message: 'Sensor data received' });
 });
 
-// GET LATEST SENSOR DATA
+// GET LATEST SENSOR DATA (WITH DEVICE ID)
 app.get('/latest/:device_id', (req, res) => {
   res.json(latestSensorData[req.params.device_id] || {});
+});
+
+// FRONTEND FRIENDLY ENDPOINT
+app.get('/latest-sensor', (req, res) => {
+  const keys = Object.keys(latestSensorData);
+  if (keys.length === 0) return res.json({ message: "No data yet" });
+  res.json(latestSensorData[keys[0]]);
 });
 
 // SAVE PATIENT RECORD
@@ -146,9 +153,9 @@ app.post('/submit', async (req, res) => {
   res.json({ message: 'Patient saved', patientNumber: patientCounter });
 });
 
-// ROOT: SERVE LOGIN PAGE
+// SERVE form.html AT ROOT
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'form.html'));
 });
 
 app.listen(PORT, () =>
