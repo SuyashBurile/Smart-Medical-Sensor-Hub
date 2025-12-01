@@ -2,47 +2,54 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Doctor Login — Smart Medical</title>
+  <title>Doctor Login — Smart Medical Sensor Hub</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+
   <main class="login-wrap">
-    <section class="login-card">
-      <h1>Smart Medical — Doctor Login</h1>
+    <section class="login-card card glass">
+      <h1>Smart Medical Sensor Hub</h1>
+      <p class="muted small">Authorized access only</p>
+
       <div class="input-row">
-        <input id="username" placeholder="Username" autocomplete="username" />
+        <label>Username</label>
+        <input id="username" placeholder="Doctor">
       </div>
+
       <div class="input-row">
-        <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
+        <label>Password</label>
+        <input id="password" type="password" placeholder="SB">
       </div>
+
       <div class="actions">
-        <button id="loginBtn">Sign in</button>
+        <button id="loginBtn" class="btn primary">Sign in</button>
       </div>
+
       <p id="errorMsg" class="muted error"></p>
-      <p class="muted small">Use your doctor credentials to access patient monitoring.</p>
     </section>
   </main>
 
-  <script src="script.js"></script>
   <script>
-    // local login hook: uses /login endpoint in server.js
     document.getElementById('loginBtn').addEventListener('click', async () => {
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
-      document.getElementById('errorMsg').textContent = '';
-      try {
-        const res = await fetch('/login', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({username, password})
-        });
-        if (res.status === 200) window.location.href = 'form.html';
-        else document.getElementById('errorMsg').textContent = 'Invalid credentials';
-      } catch (err) {
-        document.getElementById('errorMsg').textContent = 'Network error';
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const err = document.getElementById('errorMsg');
+
+      const res = await fetch('/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ username, password })
+      });
+
+      if (res.status === 200) {
+        window.location.href = 'form.html';
+      } else {
+        err.textContent = 'Incorrect ID or Password';
       }
     });
   </script>
+
 </body>
 </html>

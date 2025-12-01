@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <title>Smart Medical — Dashboard</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
 </head>
@@ -12,7 +12,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div class="brand">
-        <svg class="logo" width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <svg class="logo" width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <rect x="1.8" y="1.8" width="20.4" height="20.4" rx="5" fill="url(#g)"></rect>
           <path d="M8 12h8M12 8v8" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
           <defs>
@@ -46,18 +46,22 @@
           <div class="pc-head">
             <div>
               <h3 class="pc-title">Patient Info</h3>
-              <p class="pc-sub">Quick capture before saving</p>
+              <p class="pc-sub">Fill before saving</p>
             </div>
             <div class="status-dot" id="connDot" title="Device status">●</div>
           </div>
 
           <form id="patientForm" class="pc-form">
             <label class="lbl">Full name</label>
-            <input id="name" placeholder="John Doe" autocomplete="name" required>
+            <input id="name" placeholder="John Doe" required>
 
             <div class="row">
-              <div class="col"><label class="lbl">Age</label><input id="age" type="number" min="0" placeholder="32" required></div>
-              <div class="col"><label class="lbl">Gender</label>
+              <div class="col">
+                <label class="lbl">Age</label>
+                <input id="age" type="number" min="0" placeholder="32" required>
+              </div>
+              <div class="col">
+                <label class="lbl">Gender</label>
                 <select id="gender">
                   <option>Male</option>
                   <option>Female</option>
@@ -74,7 +78,9 @@
               <button class="btn" type="button" onclick="nextPatient()">Clear</button>
             </div>
 
-            <div class="small-note">Saved rows are exported to <strong>Excel</strong> and <strong>CSV</strong>.</div>
+            <div class="small-note">
+              Saved records are exported to <strong>Excel</strong> and <strong>CSV</strong> on the server.
+            </div>
           </form>
         </div>
 
@@ -85,8 +91,8 @@
               <div id="recentSaved" class="qs-num">—</div>
             </div>
             <div>
-              <div class="qs-title">Connected</div>
-              <div id="connectedText" class="qs-num">—</div>
+              <div class="qs-title">Device</div>
+              <div id="connectedText" class="qs-num">Offline</div>
             </div>
           </div>
         </div>
@@ -94,9 +100,9 @@
         <div class="card help-card">
           <h4>Tips</h4>
           <ul>
-            <li>Ensure ESP32 is online and sending to <code>/sensor-data</code>.</li>
-            <li>Use device ID per board (esp32-001...)</li>
-            <li>Click <strong>Next Patient</strong> to begin a new record.</li>
+            <li>Ensure ESP32 is sending live data to <code>/sensor-data</code>.</li>
+            <li>Device ID should match the one programmed on ESP32.</li>
+            <li>After saving, click <strong>Next Patient</strong> for a new record.</li>
           </ul>
         </div>
       </aside>
@@ -150,6 +156,14 @@
             </div>
             <div class="m-icon">⚡</div>
           </div>
+
+          <div class="metric card grad lung">
+            <div class="m-left">
+              <div class="m-title">Lung Capacity</div>
+              <div id="lung" class="m-value">-- <span class="muted">units</span></div>
+            </div>
+            <div class="m-icon">💨</div>
+          </div>
         </div>
 
         <div class="ecg-card card">
@@ -165,7 +179,9 @@
             <canvas id="ecgCanvas"></canvas>
           </div>
 
-          <div class="ecg-footer muted">Realtime ECG — values are plotted as they arrive from the device.</div>
+          <div class="ecg-footer muted">
+            Realtime ECG — plotted as values arrive from the device.
+          </div>
         </div>
       </section>
     </main>

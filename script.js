@@ -1,125 +1,174 @@
-/* script.js — enhanced for live ECG plotting + 7-parameter dashboard
-   Replace the old script.js with this file (complete replacement).
-*/
+// script.js — live metrics, ECG plotting, patient save logic
 
-// Device id (default). You can change this in the form input on the left.
-const DEFAULT_DEVICE = "esp32-001";
-let deviceIdInput = document.getElementById ? document.getElementById('deviceId') : null;
+const DEFAULT_DEVICE = 'esp32-001';
 
-// current patient id returned after save
 let lastSavedPatientNumber = null;
-
-// fetch intervals
-const METRIC_INTERVAL = 2000;  // metrics (HR, SPO2, temp...) every 2s
-const ECG_INTERVAL = 300;      // request ECG samples ~ every 300ms
-
-// ECG plotting buffer
-const ECG_BUFFER_SIZE = 600;
-let ecgBuffer = new Array(ECG_BUFFER_SIZE).fill(null);
+let ecgBufferSize = 600;
+let ecgBuffer = new Array(ecgBufferSize).fill(null);
 let ecgHead = 0;
+let ecgZoom = 1.0;
 
-// canvas setup
+const METRIC_INTERVAL = 2000;  // 2s for vitals
+const ECG_INTERVAL = 300;      // extra sampling for ECG
+
+// canvas init
 const canvas = document.getElementById('ecgCanvas');
-const ctx = canvas ? canvas.getContext('2d') : null;
-const DPR = window.devicePixelRatio || 1;
+let ctx = null;
 if (canvas) {
+  const DPR = window.devicePixelRatio || 1;
   canvas.width = canvas.clientWidth * DPR;
   canvas.height = canvas.clientHeight * DPR;
+  ctx = canvas.getContext('2d');
   ctx.scale(DPR, DPR);
 }
 
-// helper: get device id from the input (if present)
-function getDeviceId(){
+// helpers
+function getDeviceId() {
   const el = document.getElementById('deviceId');
-  return (el && el.value) ? el.value.trim() : DEFAULT_DEVICE;
+  return (el && el.value.trim()) || DEFAULT_DEVICE;
 }
 
-// draw ECG buffer on canvas
-function drawECG(){
+function pushECGSample(value) {
+  const v = Number(value);
+  if (Number.isNaN(v)) return;
+  ecgBuffer[ecgHead] = v;
+  ecgHead = (ecgHead + 1) % ecgBufferSize;
+}
+
+function drawECG() {
   if (!ctx || !canvas) return;
+
   const w = canvas.clientWidth;
   const h = canvas.clientHeight;
-  ctx.clearRect(0,0,w,h);
 
-  // background grid
-  ctx.fillStyle = "#02060a";
-  ctx.fillRect(0,0,w,h);
+  ctx.clearRect(0, 0, w, h);
 
-  // draw midline
-  ctx.strokeStyle = "rgba(255,255,255,0.06)";
+  // background
+  ctx.fillStyle = '#010814';
+  ctx.fillRect(0, 0, w, h);
+
+  // midline
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(0,h/2); ctx.lineTo(w,h/2); ctx.stroke();
+  ctx.moveTo(0, h / 2);
+  ctx.lineTo(w, h / 2);
+  ctx.stroke();
 
-  // draw signal
-  ctx.strokeStyle = "#00ff7b";
+  // ECG line
+  const data = ecgBuffer.filter(v => v !== null);
+  if (!data.length) return;
+
+  const visibleCount = Math.floor(data.length / ecgZoom);
+  const slice = data.slice(-visibleCount);
+  const step = Math.max(1, Math.floor(slice.length / w));
+
+  ctx.strokeStyle = '#22c55e';
   ctx.lineWidth = 1.6;
   ctx.beginPath();
 
-  // map buffer to visible width: take last N defined samples
-  const visible = ecgBuffer.filter(v => v !== null);
-  if (visible.length === 0) return;
-
-  const step = Math.max(1, Math.floor(visible.length / w));
   let x = 0;
-  for (let i = 0; i < visible.length; i += step) {
-    const v = visible[visible.length - 1 - i]; // reverse to show newest at right
-    const norm = (v - 0) / 4095; // assume 0..4095 ADC
-    const y = h - (norm * h);
-    if (i === 0) ctx.moveTo(w - x, y);
-    else ctx.lineTo(w - x, y);
+  for (let i = 0; i < slice.length; i += step) {
+    const v = slice[i];
+    const norm = Math.max(0, Math.min(1, v / 4095)); // 0..1
+    const y = h - norm * h;
+    if (x === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
     x += 1;
   }
   ctx.stroke();
 }
 
-// push one new ECG sample
-function pushECGSample(value){
-  ecgBuffer[ecgHead] = Number(value) || 0;
-  ecgHead = (ecgHead + 1) % ECG_BUFFER_SIZE;
-}
+// update connection status
+function setConnectionStatus(online) {
+  const dot = document.getElementById('connDot');
+  const text = document.getElementById('connectedText');
+  if (!dot || !text) return;
 
-// fetch latest metrics (HR, SPO2, temp, bp, sugar, gsr)
-async function fetchMetrics(){
-  const device = getDeviceId();
-  try {
-    const res = await fetch(`/latest/${device}`);
-    if (!res.ok) return;
-    const data = await res.json();
-
-    // map fields to UI
-    document.getElementById('hr').innerText = (data.heartRate || data.hr) ? `${data.heartRate || data.hr} bpm` : '-- bpm';
-    document.getElementById('spo2').innerText = data.spo2 ? `${data.spo2} %` : (data.spo2 || '-- %');
-    document.getElementById('temp').innerText = data.temperature ? `${data.temperature} °C` : '-- °C';
-    if (data.bp) document.getElementById('bp').innerText = data.bp;
-    else if (data.bp_sys && data.bp_dia) document.getElementById('bp').innerText = `${data.bp_sys}/${data.bp_dia}`;
-    document.getElementById('sugar').innerText = (data.glucose || data.sugar) ? `${data.glucose || data.sugar} mg/dL` : '-- mg/dL';
-    document.getElementById('gsr').innerText = data.gsr ? `${data.gsr}` : '--';
-    // push ECG sample if provided
-    if (data.ecg) pushECGSample(data.ecg);
-  } catch (err) {
-    // console.log('metrics fetch failed', err);
+  if (online) {
+    dot.style.color = '#22c55e';
+    text.textContent = 'Online';
+  } else {
+    dot.style.color = '#f97373';
+    text.textContent = 'Offline';
   }
 }
 
-// periodic tasks
-setInterval(fetchMetrics, METRIC_INTERVAL);
-setInterval(() => { drawECG(); }, 200); // redraw ECG often
+// fetch metrics (HR, SpO2, temp, BP, sugar, GSR, lung, ECG)
+async function fetchMetrics() {
+  const device = getDeviceId();
+  try {
+    const res = await fetch(`/latest/${device}`);
+    if (!res.ok) {
+      setConnectionStatus(false);
+      return;
+    }
+    const data = await res.json();
+    const hasData = Object.keys(data).length > 0;
+    setConnectionStatus(hasData);
 
-// also poll faster for incoming ECG samples (server updates latest.ecg value very frequently)
-setInterval(async () => {
+    // map to UI
+    const hrEl = document.getElementById('hr');
+    const spo2El = document.getElementById('spo2');
+    const tempEl = document.getElementById('temp');
+    const bpEl = document.getElementById('bp');
+    const sugarEl = document.getElementById('sugar');
+    const gsrEl = document.getElementById('gsr');
+    const lungEl = document.getElementById('lung');
+
+    const hr = data.heartRate || data.hr;
+    if (hrEl) hrEl.innerHTML = (hr ? hr : '--') + ' <span class="muted">bpm</span>';
+
+    const spo2 = data.spo2;
+    if (spo2El) spo2El.innerHTML = (spo2 ? spo2 : '--') + ' <span class="muted">%</span>';
+
+    const temp = data.temperature;
+    if (tempEl) tempEl.innerHTML = (temp ? temp : '--') + ' <span class="muted">°C</span>';
+
+    if (bpEl) {
+      if (data.bp) bpEl.textContent = data.bp;
+      else if (data.bp_sys && data.bp_dia) bpEl.textContent = `${data.bp_sys}/${data.bp_dia}`;
+      else bpEl.textContent = '-- / --';
+    }
+
+    const sugar = data.glucose || data.sugar;
+    if (sugarEl) sugarEl.innerHTML = (sugar ? sugar : '--') + ' <span class="muted">mg/dL</span>';
+
+    const gsr = data.gsr;
+    if (gsrEl) gsrEl.textContent = gsr ? `${gsr}` : '--';
+
+    const spiro = data.spiro;
+    if (lungEl) lungEl.innerHTML = (spiro ? spiro : '--') + ' <span class="muted">units</span>';
+
+    if (data.ecg !== undefined) {
+      pushECGSample(data.ecg);
+    }
+  } catch {
+    setConnectionStatus(false);
+  }
+}
+
+// extra ECG-specific polling (more frequent)
+async function fetchECGOnly() {
   const device = getDeviceId();
   try {
     const res = await fetch(`/latest/${device}`);
     if (!res.ok) return;
     const data = await res.json();
-    if (data.ecg) pushECGSample(data.ecg);
-  } catch (e){}
-}, ECG_INTERVAL);
+    if (data.ecg !== undefined) {
+      pushECGSample(data.ecg);
+    }
+  } catch {
+    // ignore
+  }
+}
 
-// handle Save patient form
+// patient save + UI hooks
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('patientForm');
+  const patientIdEl = document.getElementById('patientId');
+  const recentSavedEl = document.getElementById('recentSaved');
+
   if (form) {
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
@@ -129,37 +178,51 @@ document.addEventListener('DOMContentLoaded', () => {
         gender: document.getElementById('gender').value,
         device_id: getDeviceId()
       };
+
       try {
-        const res = await fetch('/submit',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
+        const res = await fetch('/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
         if (res.ok) {
           const json = await res.json();
           lastSavedPatientNumber = json.patientNumber;
-          document.getElementById('patientId').innerText = lastSavedPatientNumber;
-          alert('Saved — Patient #'+ lastSavedPatientNumber);
+          if (patientIdEl) patientIdEl.textContent = lastSavedPatientNumber;
+          if (recentSavedEl) recentSavedEl.textContent = lastSavedPatientNumber;
+          alert('Saved — Patient #' + lastSavedPatientNumber);
           form.reset();
         } else {
           const txt = await res.text();
           alert('Save failed: ' + txt);
         }
-      } catch (err) {
+      } catch {
         alert('Network error while saving');
       }
     });
   }
+
+  const zoomIn = document.getElementById('zoomIn');
+  const zoomOut = document.getElementById('zoomOut');
+  if (zoomIn) zoomIn.onclick = () => { ecgZoom = Math.min(3, ecgZoom + 0.2); };
+  if (zoomOut) zoomOut.onclick = () => { ecgZoom = Math.max(0.5, ecgZoom - 0.2); };
+
+  fetchMetrics();
 });
 
-// Next patient: clear and show next patient id (if lastSaved known)
-function nextPatient(){
+// global for inline onclick
+function nextPatient() {
   const form = document.getElementById('patientForm');
   if (form) form.reset();
-  if (lastSavedPatientNumber) document.getElementById('patientId').innerText = Number(lastSavedPatientNumber) + 1;
-  else document.getElementById('patientId').innerText = '—';
+  const patientIdEl = document.getElementById('patientId');
+  if (patientIdEl) {
+    if (lastSavedPatientNumber) patientIdEl.textContent = Number(lastSavedPatientNumber) + 1;
+    else patientIdEl.textContent = '—';
+  }
 }
 window.nextPatient = nextPatient;
 
-// initial load
-fetchMetrics();
+// periodic tasks
+setInterval(fetchMetrics, METRIC_INTERVAL);
+setInterval(fetchECGOnly, ECG_INTERVAL);
+setInterval(() => { if (canvas) drawECG(); }, 200);

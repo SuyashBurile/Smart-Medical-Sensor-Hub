@@ -1,4 +1,5 @@
-// server.js — Node backend (saves to Excel + CSV)
+// server.js — Node backend (saves to Excel + CSV + serves frontend)
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const ExcelJS = require('exceljs');
@@ -13,39 +14,42 @@ const csvFile = 'patient_data.csv';
 const counterFile = 'patient_counter.json';
 
 app.use(bodyParser.json());
-app.use(express.static(__dirname)); // serve static files from project root
+app.use(express.static(__dirname));
 
-// Keep latest sensor readings per device in memory
+// latest sensor readings per device
 let latestSensorData = {};
 
 // patient counter persistence
 let patientCounter = 0;
 if (fs.existsSync(counterFile)) {
   try {
-    const saved = JSON.parse(fs.readFileSync(counterFile, 'utf8'));
-    patientCounter = saved.counter || 0;
-  } catch (e) {
+    patientCounter = JSON.parse(
+      fs.readFileSync(counterFile, 'utf8')
+    ).counter || 0;
+  } catch {
     patientCounter = 0;
   }
 }
 
-// Simple login credentials (you can change)
-const USERNAME = 'doctor';
-const PASSWORD = '1234';
+// LOGIN CREDENTIALS
+const USERNAME = 'Doctor';
+const PASSWORD = 'SB';
 
+// LOGIN ROUTE
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
   if (username === USERNAME && password === PASSWORD) {
-    res.status(200).send('OK');
-  } else {
-    res.status(401).send('Unauthorized');
+    return res.status(200).send('OK');
   }
+  res.status(401).send('Unauthorized');
 });
 
-// Receive sensor data from ESP32 (or from curl / Postman)
+// RECEIVE LIVE SENSOR DATA FROM ESP32
 app.post('/sensor-data', (req, res) => {
   const data = req.body;
-  if (!data.device_id) return res.status(400).json({ error: 'device_id required' });
+  if (!data.device_id) {
+    return res.status(400).json({ error: 'device_id required' });
+  }
 
   latestSensorData[data.device_id] = {
     device_id: data.device_id,
@@ -63,40 +67,34 @@ app.post('/sensor-data', (req, res) => {
     spiro: data.spiro || ''
   };
 
-  console.log('Received sensor data:', latestSensorData[data.device_id]);
+  console.log('Sensor Data:', latestSensorData[data.device_id]);
   res.json({ message: 'Sensor data received' });
 });
 
-// Provide latest reading for a device
+// GET LATEST SENSOR DATA
 app.get('/latest/:device_id', (req, res) => {
-  const id = req.params.device_id;
-  res.json(latestSensorData[id] || {});
+  res.json(latestSensorData[req.params.device_id] || {});
 });
 
-// Save patient info + sensor snapshot (Excel + CSV)
+// SAVE PATIENT RECORD
 app.post('/submit', async (req, res) => {
   const { name, age, gender, device_id } = req.body;
 
-  if (!device_id) return res.status(400).json({ error: 'device_id required' });
+  if (!device_id)
+    return res.status(400).json({ error: 'device_id required' });
 
   const sensor = latestSensorData[device_id] || {};
 
-  // increment and persist patient counter
-  patientCounter += 1;
-  try {
-    fs.writeFileSync(counterFile, JSON.stringify({ counter: patientCounter }));
-  } catch (e) {
-    console.error('Failed to write counter file', e);
-  }
+  patientCounter++;
+  fs.writeFileSync(counterFile, JSON.stringify({ counter: patientCounter }));
 
-  // build row object
   const row = {
     PatientNumber: patientCounter,
     Name: name || '',
     Age: age || '',
     Gender: gender || '',
     DeviceID: device_id,
-    Timestamp: sensor.timestamp || new Date().toISOString(),
+    Timestamp: sensor.timestamp || '',
     Seq: sensor.seq || '',
     HeartRate: sensor.heartRate || '',
     SpO2: sensor.spo2 || '',
@@ -107,10 +105,10 @@ app.post('/submit', async (req, res) => {
     BP_DIA: sensor.bp_dia || '',
     BP: sensor.bp || '',
     GSR: sensor.gsr || '',
-    Spiro: sensor.spiro || ''
+    LungCapacity: sensor.spiro || ''
   };
 
-  // -------- Write to Excel --------
+  // SAVE TO EXCEL
   try {
     const workbook = new ExcelJS.Workbook();
     let worksheet;
@@ -126,42 +124,33 @@ app.post('/submit', async (req, res) => {
     worksheet.addRow(row);
     await workbook.xlsx.writeFile(excelFile);
   } catch (err) {
-    console.error('Error writing Excel:', err);
-    // continue to attempt CSV write
+    console.error('Excel Save Error:', err);
   }
 
-  // -------- Write to CSV (append) --------
+  // SAVE TO CSV
   try {
-    // build CSV header if file not exists
     const keys = Object.keys(row);
+
     if (!fs.existsSync(csvFile)) {
-      const header = keys.join(',') + '\n';
-      fs.writeFileSync(csvFile, header, { encoding: 'utf8' });
+      fs.writeFileSync(csvFile, keys.join(',') + '\n');
     }
-    // escape double quotes and commas inside fields
-    const escapeCsv = (v) => {
-      if (v === null || v === undefined) return '';
-      const s = String(v);
-      if (s.includes('"') || s.includes(',') || s.includes('\n')) {
-        return `"${s.replace(/"/g, '""')}"`;
-      }
-      return s;
-    };
-    const csvLine = keys.map(k => escapeCsv(row[k])).join(',') + '\n';
-    fs.appendFileSync(csvFile, csvLine, { encoding: 'utf8' });
+
+    const escape = v => `"${String(v).replace(/"/g, '""')}"`;
+
+    const line = keys.map(k => escape(row[k])).join(',') + '\n';
+    fs.appendFileSync(csvFile, line);
   } catch (err) {
-    console.error('Error writing CSV:', err);
+    console.error('CSV Save Error:', err);
   }
 
   res.json({ message: 'Patient saved', patientNumber: patientCounter });
 });
 
-// Serve root
+// ROOT: SERVE LOGIN PAGE
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// start server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, () =>
+  console.log(`Server running on port ${PORT}`)
+);
