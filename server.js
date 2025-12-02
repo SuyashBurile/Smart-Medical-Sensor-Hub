@@ -72,12 +72,12 @@ app.post('/sensor-data', (req, res) => {
 });
 
 // GET LATEST SENSOR DATA (WITH DEVICE ID)
-app.get('/latest-all', (req, res) => {
-  res.json({
-    sender: latestSensorData["esp32_sender_1"] || {},
-    receiver: latestSensorData["esp32_receiver_glucose"] || {}
-  });
+// GET LATEST SENSOR DATA BY DEVICE ID
+app.get('/latest/:id', (req, res) => {
+  const id = req.params.id;
+  res.json(latestSensorData[id] || {});
 });
+
 
 
 // FRONTEND FRIENDLY ENDPOINT
@@ -158,9 +158,10 @@ app.post('/submit', async (req, res) => {
 });
 
 // SERVE form.html AT ROOT
-app.get('/', (req, res) => {
+app.get('/form.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'form.html'));
 });
+
 
 app.listen(PORT, () =>
   console.log(`Server running on port ${PORT}`)
