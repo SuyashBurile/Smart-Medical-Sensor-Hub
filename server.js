@@ -72,9 +72,13 @@ app.post('/sensor-data', (req, res) => {
 });
 
 // GET LATEST SENSOR DATA (WITH DEVICE ID)
-app.get('/latest/:device_id', (req, res) => {
-  res.json(latestSensorData[req.params.device_id] || {});
+app.get('/latest-all', (req, res) => {
+  res.json({
+    sender: latestSensorData["esp32_sender_1"] || {},
+    receiver: latestSensorData["esp32_receiver_glucose"] || {}
+  });
 });
+
 
 // FRONTEND FRIENDLY ENDPOINT
 app.get('/latest-sensor', (req, res) => {

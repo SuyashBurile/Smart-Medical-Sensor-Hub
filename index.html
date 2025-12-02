@@ -1,55 +1,52 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8">
   <title>Doctor Login — Smart Medical Sensor Hub</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
 
-  <main class="login-wrap">
-    <section class="login-card card glass">
-      <h1>Smart Medical Sensor Hub</h1>
-      <p class="muted small">Authorized access only</p>
+<body class="login-wrap">
+  <section class="login-card card glass">
+    <h1>Smart Medical Sensor Hub</h1>
+    <p class="muted small">Authorized access only</p>
 
-      <div class="input-row">
-        <label>Username</label>
-        <input id="username" placeholder="Doctor">
-      </div>
+    <div class="input-row">
+      <label>Username</label>
+      <input id="username" placeholder="Doctor">
+    </div>
 
-      <div class="input-row">
-        <label>Password</label>
-        <input id="password" type="password" placeholder="SB">
-      </div>
+    <div class="input-row">
+      <label>Password</label>
+      <input id="password" type="password" placeholder="SB">
+    </div>
 
-      <div class="actions">
-        <button id="loginBtn" class="btn primary">Sign in</button>
-      </div>
+    <div class="actions">
+      <button id="loginBtn" class="btn primary">Sign in</button>
+    </div>
 
-      <p id="errorMsg" class="muted error"></p>
-    </section>
-  </main>
+    <p id="errorMsg" class="muted error"></p>
+  </section>
 
-  <script>
-    document.getElementById('loginBtn').addEventListener('click', async () => {
-      const username = document.getElementById('username').value.trim();
-      const password = document.getElementById('password').value.trim();
-      const err = document.getElementById('errorMsg');
+<script>
+  document.getElementById("loginBtn").addEventListener("click", async () => {
+    const username = username.value.trim();
+    const password = document.getElementById("password").value.trim();
+    const err = document.getElementById("errorMsg");
 
-      const res = await fetch('/login', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ username, password })
-      });
-
-      if (res.status === 200) {
-        window.location.href = 'form.html';
-      } else {
-        err.textContent = 'Incorrect ID or Password';
-      }
+    const res = await fetch("/login", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ username, password })
     });
-  </script>
+
+    if (res.status === 200) {
+      window.location.href = "form.html";
+    } else {
+      err.textContent = "Incorrect username or password.";
+    }
+  });
+</script>
 
 </body>
 </html>
