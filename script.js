@@ -1,141 +1,131 @@
-// script.js — FINAL WORKING VERSION
+// ================== LOGIN ==================
+function doLogin() {
+  let u = document.getElementById("username").value;
+  let p = document.getElementById("password").value;
 
-function setText(id, value, fallback="--") {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.textContent = (value === "" || value === undefined || value === null)
-    ? fallback
-    : value;
+  if (u === "admin" && p === "admin") {
+    document.getElementById("login-box").classList.add("hidden");
+    document.getElementById("main-box").classList.remove("hidden");
+  } else {
+    document.getElementById("login-error").innerText = "Invalid credentials!";
+  }
 }
 
-// ECG
-const ecgBuffer = [];
-let ecgZoom = 1;
-
-function pushEcg(val) {
-  if (typeof val !== "number") return;
-  ecgBuffer.push(val);
-  if (ecgBuffer.length > 600) ecgBuffer.shift();
-  drawEcg();
+// ================== TEXT UPDATE HELPER ==================
+function setText(id, value) {
+  document.getElementById(id).innerText = value ?? "--";
 }
 
-function drawEcg() {
-  const canvas = document.getElementById("ecgCanvas");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
+// ================== CHART INITIALIZATION ==================
+let hrData = [];
+let gsrData = [];
+let spiroData = [];
+let timeLabels = [];
 
-  const w = canvas.width, h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
+const hrChart = new Chart(document.getElementById("hrChart"), {
+  type: "line",
+  data: {
+    labels: timeLabels,
+    datasets: [{ label: "HR BPM", data: hrData, borderWidth: 2 }]
+  },
+  options: { animation: false, scales: { y: { suggestedMin: 40, suggestedMax: 150 } } }
+});
 
-  ctx.strokeStyle = "rgba(255,255,255,0.2)";
-  ctx.beginPath(); ctx.moveTo(0, h/2); ctx.lineTo(w, h/2); ctx.stroke();
+const gsrChart = new Chart(document.getElementById("gsrChart"), {
+  type: "line",
+  data: {
+    labels: timeLabels,
+    datasets: [{ label: "GSR %", data: gsrData, borderWidth: 2 }]
+  },
+  options: { animation: false, scales: { y: { suggestedMin: 0, suggestedMax: 100 } } }
+});
 
-  if (ecgBuffer.length < 2) return;
+const spiroChart = new Chart(document.getElementById("spiroChart"), {
+  type: "line",
+  data: {
+    labels: timeLabels,
+    datasets: [{ label: "Spiro Value", data: spiroData, borderWidth: 2 }]
+  },
+  options: { animation: false, scales: { y: { suggestedMin: 4000, suggestedMax: 7000 } } }
+});
 
-  ctx.strokeStyle = "#00f0ff";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
+// ================== ECG CANVAS ==================
+const ecgCanvas = document.getElementById("ecgCanvas");
+const ecgCtx = ecgCanvas.getContext("2d");
+let ecgX = 0;
 
-  const scale = h * 0.4 * ecgZoom;
+function drawECG(value) {
+  let y = 150 - value * 0.03; // scale ECG amplitude
+  if (y < 0) y = 0;
+  if (y > 150) y = 150;
 
-  ecgBuffer.forEach((v, i) => {
-    const x = (i / (ecgBuffer.length - 1)) * w;
-    const y = h/2 - ((v/4095 - 0.5)*2)*scale;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-
-  ctx.stroke();
-}
-
-// MAIN
-document.addEventListener("DOMContentLoaded", () => {
-
-  const fetchDeviceBtn = document.getElementById("fetchLatestBtn");
-  const fetchAllBtn = document.getElementById("fetchAllBtn");
-
-  async function loadAll() {
-    try {
-      const res = await fetch("/latest-all");
-      const { sender={}, receiver={} } = await res.json();
-
-      // Sender
-      setText("hrValue", sender.heartRate);
-      setText("spo2Value", sender.spo2);
-      setText("tempValue", sender.temperature);
-
-      const bp = sender.bp_sys && sender.bp_dia
-        ? `${sender.bp_sys} / ${sender.bp_dia}`
-        : sender.bp || "-- / --";
-      setText("bpValue", bp);
-
-      setText("gsrValue", sender.gsr);
-      setText("spiroValue", sender.spiro);
-
-      if (sender.ecg !== "" && sender.ecg !== undefined) {
-        const v = Number(sender.ecg);
-        if (!isNaN(v)) pushEcg(v);
-      }
-
-      // Receiver
-      setText("glucoseValue", receiver.glucose);
-
-      fetchStatus.textContent = "All devices loaded.";
-      deviceStatus.textContent = "Online";
-      deviceStatus.classList.remove("off");
-
-    } catch (e) {
-      fetchStatus.textContent = "Network error.";
-    }
+  // Move X
+  ecgX++;
+  if (ecgX >= ecgCanvas.width) {
+    ecgX = 0;
+    ecgCtx.clearRect(0, 0, ecgCanvas.width, ecgCanvas.height);
   }
 
-  fetchAllBtn.addEventListener("click", loadAll);
-  fetchDeviceBtn.addEventListener("click", async () => {
-    const id = deviceId.value.trim();
-    const res = await fetch(`/latest/${id}`);
-    const data = await res.json();
+  // Draw pixel
+  ecgCtx.fillStyle = "lime";
+  ecgCtx.fillRect(ecgX, y, 2, 2);
+}
 
-    setText("hrValue", data.heartRate);
-    setText("spo2Value", data.spo2);
-    setText("tempValue", data.temperature);
-    setText("gsrValue", data.gsr);
-    setText("spiroValue", data.spiro);
-    setText("glucoseValue", data.glucose);
+// ================== AUTO SENSOR UPDATES ==================
+setInterval(async () => {
+  let res = await fetch("/latest");
+  let data = await res.json();
 
-    const bp = data.bp_sys && data.bp_dia
-     ? `${data.bp_sys} / ${data.bp_dia}`
-     : data.bp || "-- / --";
-    setText("bpValue", bp);
+  // Update text fields
+  setText("hr", data.heartRate);
+  setText("spo2", data.spo2);
+  setText("temp", data.temperature);
+  setText("gsr", data.gsr);
+  setText("spiro", data.spiro);
+  setText("bp", `${data.bp_sys || "--"} / ${data.bp_dia || "--"}`);
+  setText("pulse", data.bp || "--");
+  setText("glucose", data.glucose);
 
-    if (data.ecg) pushEcg(Number(data.ecg));
+  // Add data to graph arrays
+  const t = new Date().toLocaleTimeString();
+  timeLabels.push(t);
 
-    fetchStatus.textContent = "Loaded.";
+  hrData.push(data.heartRate || 0);
+  gsrData.push(data.gsr || 0);
+  spiroData.push(data.spiro || 0);
+
+  if (timeLabels.length > 50) {
+    timeLabels.shift();
+    hrData.shift();
+    gsrData.shift();
+    spiroData.shift();
+  }
+
+  hrChart.update();
+  gsrChart.update();
+  spiroChart.update();
+
+  // ECG (only when value exists)
+  if (data.ecg !== undefined) {
+    drawECG(data.ecg);
+  }
+
+}, 300);
+
+// ================== SAVE PATIENT RECORD ==================
+async function saveRecord() {
+  let payload = {
+    name: document.getElementById("pname").value,
+    age: document.getElementById("page").value,
+    gender: document.getElementById("pgender").value
+  };
+
+  let res = await fetch("/save-record", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(payload)
   });
 
-  // Save Patient
-  saveBtn.addEventListener("click", async () => {
-    const res = await fetch("/submit", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        name: fullName.value,
-        age: age.value,
-        gender: gender.value,
-        device_id: deviceId.value
-      })
-    });
-
-    const data = await res.json();
-    alert("Saved!");
-    patientNumber.textContent = data.patientNumber;
-    lastSaved.textContent = new Date().toLocaleString();
-  });
-
-  clearBtn.addEventListener("click", () => {
-    fullName.value = "";
-    age.value = "";
-    gender.value = "Male";
-  });
-
-  loadAll();
-});
+  let txt = await res.text();
+  document.getElementById("save-status").innerText = txt;
+}
