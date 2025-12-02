@@ -4,11 +4,14 @@
   <meta charset="UTF-8">
   <title>Smart Medical Sensor Hub</title>
   <link rel="stylesheet" href="styles.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+  <!-- Chart.js for real-time graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
+
+  <!-- LOGIN PAGE -->
   <div id="login-box" class="card">
     <h2>Login</h2>
     <input id="username" type="text" placeholder="Enter username">
@@ -16,14 +19,21 @@
     <button onclick="doLogin()">Login</button>
     <p id="login-error"></p>
   </div>
+
+  <!-- MAIN DASHBOARD -->
   <div id="main-box" class="hidden">
+
     <h1>Smart Medical Sensor Hub</h1>
 
     <div class="row">
+
+      <!-- Patient Form -->
       <div class="card">
         <h3>Patient Details</h3>
+
         <input id="pname" type="text" placeholder="Patient Name">
         <input id="page" type="number" placeholder="Age">
+
         <select id="pgender">
           <option value="">Select Gender</option>
           <option>Male</option>
@@ -35,47 +45,50 @@
         <p id="save-status"></p>
       </div>
 
+      <!-- Live Sensor Values -->
       <div class="card">
         <h3>Live Sensor Data</h3>
 
         <p>Heart Rate: <span id="hr">--</span></p>
         <p>SpO₂: <span id="spo2">--</span></p>
         <p>Temperature: <span id="temp">--</span></p>
-        <p>GSR: <span id="gsr">--</span></p>
-        <p>Spirometer: <span id="spiro">--</span></p>
+        <p>GSR Level: <span id="gsr">--</span></p>
+        <p>Lung Capacity: <span id="spiro">--</span></p>
         <p>BP (SYS/DIA): <span id="bp">--</span></p>
         <p>Pulse: <span id="pulse">--</span></p>
         <p>Glucose: <span id="glucose">--</span></p>
       </div>
+
     </div>
+
+    <!-- REAL-TIME GRAPHS -->
     <h2>Real-Time Graphs</h2>
 
-<div class="row">
+    <div class="row">
 
-  <div class="card">
-    <h3>Heart Rate</h3>
-    <canvas id="hrChart"></canvas>
+      <div class="card">
+        <h3>Heart Rate</h3>
+        <canvas id="hrChart"></canvas>
+      </div>
+
+      <div class="card">
+        <h3>GSR Stress</h3>
+        <canvas id="gsrChart"></canvas>
+      </div>
+
+      <div class="card">
+        <h3>Spirometer</h3>
+        <canvas id="spiroChart"></canvas>
+      </div>
+
+      <div class="card">
+        <h3>ECG Waveform</h3>
+        <canvas id="ecgCanvas" width="450" height="150" style="background:black;"></canvas>
+      </div>
+
+    </div>
   </div>
 
-  <div class="card">
-    <h3>GSR (Stress)</h3>
-    <canvas id="gsrChart"></canvas>
-  </div>
-
-  <div class="card">
-    <h3>Spirometer</h3>
-    <canvas id="spiroChart"></canvas>
-  </div>
-
-  <div class="card">
-    <h3>ECG Waveform</h3>
-    <canvas id="ecgCanvas" width="450" height="150" style="background:black;"></canvas>
-  </div>
-
-</div>
-
-  </div>
-
-<script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>

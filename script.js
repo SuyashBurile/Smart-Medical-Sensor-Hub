@@ -1,77 +1,79 @@
-// ================== LOGIN ==================
+// ====================== LOGIN ======================
 function doLogin() {
   let u = document.getElementById("username").value;
   let p = document.getElementById("password").value;
 
+  // Default admin login
   if (u === "admin" && p === "admin") {
     document.getElementById("login-box").classList.add("hidden");
     document.getElementById("main-box").classList.remove("hidden");
   } else {
-    document.getElementById("login-error").innerText = "Invalid credentials!";
+    document.getElementById("login-error").innerText = "Invalid username or password!";
   }
 }
 
-// ================== TEXT UPDATE HELPER ==================
+// ====================== SENSOR TEXT UPDATE ======================
 function setText(id, value) {
   document.getElementById(id).innerText = value ?? "--";
 }
 
-// ================== CHART INITIALIZATION ==================
+// ====================== REAL-TIME GRAPHS ======================
+let timeLabels = [];
 let hrData = [];
 let gsrData = [];
 let spiroData = [];
-let timeLabels = [];
 
+// --- HR Chart ---
 const hrChart = new Chart(document.getElementById("hrChart"), {
   type: "line",
   data: {
     labels: timeLabels,
-    datasets: [{ label: "HR BPM", data: hrData, borderWidth: 2 }]
+    datasets: [{ label: "HR (BPM)", data: hrData, borderWidth: 2, borderColor: "red" }]
   },
-  options: { animation: false, scales: { y: { suggestedMin: 40, suggestedMax: 150 } } }
+  options: { animation: false }
 });
 
+// --- GSR Chart ---
 const gsrChart = new Chart(document.getElementById("gsrChart"), {
   type: "line",
   data: {
     labels: timeLabels,
-    datasets: [{ label: "GSR %", data: gsrData, borderWidth: 2 }]
+    datasets: [{ label: "GSR (%)", data: gsrData, borderWidth: 2, borderColor: "blue" }]
   },
-  options: { animation: false, scales: { y: { suggestedMin: 0, suggestedMax: 100 } } }
+  options: { animation: false }
 });
 
+// --- SPIRO Chart ---
 const spiroChart = new Chart(document.getElementById("spiroChart"), {
   type: "line",
   data: {
     labels: timeLabels,
-    datasets: [{ label: "Spiro Value", data: spiroData, borderWidth: 2 }]
+    datasets: [{ label: "Spiro Value", data: spiroData, borderWidth: 2, borderColor: "green" }]
   },
-  options: { animation: false, scales: { y: { suggestedMin: 4000, suggestedMax: 7000 } } }
+  options: { animation: false }
 });
 
-// ================== ECG CANVAS ==================
+// ====================== ECG CANVAS DRAW ======================
 const ecgCanvas = document.getElementById("ecgCanvas");
 const ecgCtx = ecgCanvas.getContext("2d");
 let ecgX = 0;
 
-function drawECG(value) {
-  let y = 150 - value * 0.03; // scale ECG amplitude
+function drawECG(val) {
+  let y = 150 - (val * 0.03);
   if (y < 0) y = 0;
   if (y > 150) y = 150;
 
-  // Move X
   ecgX++;
   if (ecgX >= ecgCanvas.width) {
     ecgX = 0;
     ecgCtx.clearRect(0, 0, ecgCanvas.width, ecgCanvas.height);
   }
 
-  // Draw pixel
   ecgCtx.fillStyle = "lime";
   ecgCtx.fillRect(ecgX, y, 2, 2);
 }
 
-// ================== AUTO SENSOR UPDATES ==================
+// ====================== AUTO UPDATE SENSORS ======================
 setInterval(async () => {
   let res = await fetch("/latest");
   let data = await res.json();
@@ -82,18 +84,20 @@ setInterval(async () => {
   setText("temp", data.temperature);
   setText("gsr", data.gsr);
   setText("spiro", data.spiro);
-  setText("bp", `${data.bp_sys || "--"} / ${data.bp_dia || "--"}`);
-  setText("pulse", data.bp || "--");
+  setText("bp", `${data.bp_sys} / ${data.bp_dia}`);
+  setText("pulse", data.bp);
   setText("glucose", data.glucose);
 
-  // Add data to graph arrays
-  const t = new Date().toLocaleTimeString();
+  // Graph time label
+  let t = new Date().toLocaleTimeString();
   timeLabels.push(t);
 
+  // Add data points
   hrData.push(data.heartRate || 0);
   gsrData.push(data.gsr || 0);
   spiroData.push(data.spiro || 0);
 
+  // Remove old data after 50 points
   if (timeLabels.length > 50) {
     timeLabels.shift();
     hrData.shift();
@@ -105,14 +109,14 @@ setInterval(async () => {
   gsrChart.update();
   spiroChart.update();
 
-  // ECG (only when value exists)
-  if (data.ecg !== undefined) {
+  // ECG value draw
+  if (data.ecg !== undefined && data.ecg !== "--") {
     drawECG(data.ecg);
   }
 
 }, 300);
 
-// ================== SAVE PATIENT RECORD ==================
+// ====================== SAVE PATIENT RECORD ======================
 async function saveRecord() {
   let payload = {
     name: document.getElementById("pname").value,
@@ -122,7 +126,7 @@ async function saveRecord() {
 
   let res = await fetch("/save-record", {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
 
