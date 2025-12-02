@@ -1,10 +1,14 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
-const app = express();
+const cors = require("cors");
 
+const app = express();
+app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname));  // <--- Serves CSS, JS, HTML automatically
+
+// Serve static files
+app.use(express.static(path.join(__dirname)));
 
 let latest = {
   heartRate: "--",
@@ -19,23 +23,23 @@ let latest = {
   ecg: "--"
 };
 
-// ---------- Serve Homepage ----------
+// Home route
 app.get("/", (req, res) => {
-  res.sendFile(__dirname + "/form.html");
+  res.sendFile(path.join(__dirname, "form.html"));
 });
 
-// ---------- Receive ESP32 Sensor Data ----------
+// ESP32 → Server
 app.post("/sensor-data", (req, res) => {
   Object.assign(latest, req.body);
   res.sendStatus(200);
 });
 
-// ---------- Send Latest Values to Dashboard ----------
+// Dashboard → fetch latest
 app.get("/latest", (req, res) => {
   res.json(latest);
 });
 
-// ---------- Save Patient Record ----------
+// Save CSV record
 app.post("/save-record", (req, res) => {
   const file = path.join(__dirname, "records.csv");
   const { name, age, gender } = req.body;
@@ -68,7 +72,6 @@ app.post("/save-record", (req, res) => {
   res.send("Patient record saved successfully!");
 });
 
-// ---------- Start Server ----------
-app.listen(3000, () =>
-  console.log("Server running on http://localhost:3000")
-);
+// Render Cloud Port
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log("Server running on port " + PORT));

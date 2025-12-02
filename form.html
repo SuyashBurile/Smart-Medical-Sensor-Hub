@@ -1,47 +1,41 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Smart Medical Sensor Hub</title>
-  <link rel="stylesheet" href="styles.css">
-
-  <!-- Chart.js for real-time graphs -->
+  <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
 
-  <!-- LOGIN PAGE -->
+  <!-- LOGIN -->
   <div id="login-box" class="card">
     <h2>Login</h2>
-    <input id="username" type="text" placeholder="Enter username">
-    <input id="password" type="password" placeholder="Enter password">
+    <input id="username" type="text" placeholder="Username" />
+    <input id="password" type="password" placeholder="Password" />
     <button onclick="doLogin()">Login</button>
     <p id="login-error"></p>
   </div>
 
   <!-- MAIN DASHBOARD -->
   <div id="main-box" class="hidden">
-
     <h1>Smart Medical Sensor Hub</h1>
 
     <div class="row">
 
       <!-- Patient Form -->
       <div class="card">
-        <h3>Patient Details</h3>
-
-        <input id="pname" type="text" placeholder="Patient Name">
-        <input id="page" type="number" placeholder="Age">
-
+        <h3>Patient Form</h3>
+        <input id="pname" type="text" placeholder="Name" />
+        <input id="page" type="number" placeholder="Age" />
         <select id="pgender">
           <option value="">Select Gender</option>
           <option>Male</option>
           <option>Female</option>
           <option>Other</option>
         </select>
-
-        <button onclick="saveRecord()">Save Patient Record</button>
+        <button onclick="saveRecord()">Save Record</button>
         <p id="save-status"></p>
       </div>
 
@@ -50,18 +44,17 @@
         <h3>Live Sensor Data</h3>
 
         <p>Heart Rate: <span id="hr">--</span></p>
-        <p>SpO₂: <span id="spo2">--</span></p>
+        <p>SpO2: <span id="spo2">--</span></p>
         <p>Temperature: <span id="temp">--</span></p>
-        <p>GSR Level: <span id="gsr">--</span></p>
-        <p>Lung Capacity: <span id="spiro">--</span></p>
-        <p>BP (SYS/DIA): <span id="bp">--</span></p>
+        <p>GSR: <span id="gsr">--</span></p>
+        <p>Spirometer: <span id="spiro">--</span></p>
+        <p>BP: <span id="bp">--</span></p>
         <p>Pulse: <span id="pulse">--</span></p>
         <p>Glucose: <span id="glucose">--</span></p>
-      </div>
 
+      </div>
     </div>
 
-    <!-- REAL-TIME GRAPHS -->
     <h2>Real-Time Graphs</h2>
 
     <div class="row">
@@ -72,7 +65,7 @@
       </div>
 
       <div class="card">
-        <h3>GSR Stress</h3>
+        <h3>GSR</h3>
         <canvas id="gsrChart"></canvas>
       </div>
 
